@@ -215,7 +215,7 @@ function updateOrderBell() {
   const orderBell = document.getElementById('orderBell');
   const hasZeroQuantityItems = products.some(p => p.qty === 0);
   if (orderBell) {
-    orderBell.style.display = hasZeroQuantityItems ? 'inline' : 'none';
+    orderBell.style.display = hasZeroQuantityItems ? 'inline-block' : 'none';
   }
 }
 
@@ -412,7 +412,7 @@ markOrderedBtn.addEventListener('click',()=>{
     const qty=parseFloat(inp.value);
     if(qty>0){products[idx].qty=round(products[idx].qty+qty);}
   });
-  save(); renderAll();
+  save(); renderAll(); updateOrderBell();
 });
 
 /* ---------- DASHBOARD ---------- */
