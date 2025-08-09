@@ -40,7 +40,10 @@
   <button onclick="showPage('magazzino')">Magazzino</button>
   <button onclick="showPage('vendite')">Vendite</button>
   <button onclick="showPage('spese')">Spese</button>
-  <button onclick="showPage('ordinare')">Cose da ordinare</button>
+  <button onclick="showPage('ordinare')" id="ordinareBtn" >
+  Cose da ordinare
+  <span id="orderBell" style="display:none; background-color: red; width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-left: 5px;"></span>
+</button>
   <button onclick="showPage('incassi')">Incassi</button>
   <button onclick="downloadExcel()" style="margin-left:auto">Scarica Excel</button>
 </nav>
@@ -190,8 +193,7 @@
 /* ---------- UTIL ---------- */
 function localDateISO() {
   const d = new Date();
-  const pad = n => n.toString().padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  return d.toLocaleDateString('it-IT', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 let products   = JSON.parse(localStorage.getItem('prod'))  || [];
 let expenses   = JSON.parse(localStorage.getItem('exp'))   || [];
@@ -207,6 +209,14 @@ const round = n => Math.round(n*100)/100;
 function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+}
+
+function updateOrderBell() {
+  const orderBell = document.getElementById('orderBell');
+  const hasZeroQuantityItems = products.some(p => p.qty === 0);
+  if (orderBell) {
+    orderBell.style.display = hasZeroQuantityItems ? 'inline' : 'none';
+  }
 }
 
 /* ---------- MAGAZZINO ---------- */
@@ -560,6 +570,7 @@ function renderAll(){
   renderExpensesHistory();
   renderIncassiHistory();
   updateIncassiToday();
+  updateOrderBell();
 }
 renderAll();
 </script>
