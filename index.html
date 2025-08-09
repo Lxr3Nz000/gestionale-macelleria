@@ -65,7 +65,7 @@
     </thead>
     <tbody></tbody>
   </table>
-</section>
+
 <canvas id="financeChart" height="100"></canvas>
   
 </section>
@@ -419,6 +419,7 @@ markOrderedBtn.addEventListener('click',()=>{
 });
 
 /* ---------- DASHBOARD ---------- */
+/* ---------- DASHBOARD ---------- */
 function updateDashboard() {
   const summaryType = document.getElementById('summaryType').value;
   const generalSummaryTable = document.getElementById('generalSummaryTable').getElementsByTagName('tbody')[0];
@@ -466,6 +467,7 @@ function updateDashboard() {
     row.insertCell().textContent = round(net) + ' €';
   });
 }
+
 let finChart;
 function renderFinance() {
   const labels = [...Array(7)].map((_, i) => {
@@ -596,10 +598,9 @@ function renderExpensesHistory() {
 }
 
 /* ---------- RENDER ALL ---------- */
-function renderAll(){
+function renderAll() {
   renderProducts();
   renderSellSelect();
-  updateDashboard();
   renderFinance();
   renderExpensePie();
   renderMagazzinoChart();
@@ -610,6 +611,8 @@ function renderAll(){
   updateIncassiToday();
   updateOrderBell();
 }
+
+document.getElementById('summaryType').addEventListener('change', updateDashboard);
 renderAll();
 </script>
 </body>
