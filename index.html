@@ -50,19 +50,22 @@
 
 <section id="dashboard" class="page active">
   <h2>Dashboard</h2>
-<div class="kpi">
-  <div>Guadagno oggi: <span id="todayProfit">0 €</span></div>
-  <div>Spese oggi: <span id="todayExp">0 €</span></div>
-  <div>Saldo oggi: <span id="balance">0 €</span></div>
-  <div>Incassi oggi: <span id="todayIncassi">0 €</span></div>
-</div>
-<h3 style="margin-top: 30px;">Resoconto mensile</h3>
-<table id="monthlySummaryTable">
-  <thead>
-    <tr><th>Mese</th><th>Guadagno</th><th>Spese</th><th>Netto</th></tr>
-  </thead>
-  <tbody></tbody>
-</table>
+  <div class="filter-bar">
+    <label for="summaryType">Visualizza:</label>
+    <select id="summaryType">
+      <option value="daily">Giornalmente</option>
+      <option value="weekly">Settimanalmente</option>
+      <option value="monthly">Mensilmente</option>
+    </select>
+  </div>
+  <h3>Resoconto generale</h3>
+  <table id="generalSummaryTable">
+    <thead>
+      <tr><th>Data</th><th>Incasso</th><th>Spesa</th><th>Netto</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</section>
 <canvas id="financeChart" height="100"></canvas>
   
 </section>
@@ -417,16 +420,51 @@ markOrderedBtn.addEventListener('click',()=>{
 
 /* ---------- DASHBOARD ---------- */
 function updateDashboard() {
-  const today = localDateISO();
-  const todaySales = sales.filter(s => s.date === today).reduce((a, s) => a + s.amount, 0);
-  const todayExp = expenses.filter(e => e.date === today).reduce((a, e) => a + e.amount, 0);
-  const todayIncassi = incassi.filter(i => i.date === today).reduce((a, i) => a + i.amount, 0);
+  const summaryType = document.getElementById('summaryType').value;
+  const generalSummaryTable = document.getElementById('generalSummaryTable').getElementsByTagName('tbody')[0];
+  generalSummaryTable.innerHTML = '';
 
-  todayProfit.textContent = round(todaySales) + ' €';
-  todayExp.textContent = round(todayExp) + ' €';
-  document.getElementById('todayIncassi').textContent = round(todayIncassi) + ' €';
-  balance.textContent = round(todaySales + todayIncassi - todayExp) + ' €';
-  renderMonthlySummary();
+  let allDates, groupBy;
+  switch (summaryType) {
+    case 'daily':
+      allDates = [...new Set([...sales, ...expenses, ...incassi].map(t => t.date))];
+      groupBy = date => date;
+      break;
+    case 'weekly':
+      allDates = [...new Set([...sales, ...expenses, ...incassi].map(t => {
+        const date = new Date(t.date);
+        const startOfWeek = new Date(date.setDate(date.getDate() - date.getDay()));
+        return startOfWeek.toISOString().split('T')[0];
+      }))];
+      groupBy = date => {
+        const dateObj = new Date(date);
+        const startOfWeek = new Date(dateObj.setDate(dateObj.getDate() - dateObj.getDay()));
+        return startOfWeek.toISOString().split('T')[0];
+      };
+      break;
+    case 'monthly':
+      allDates = [...new Set([...sales, ...expenses, ...incassi].map(t => t.date.slice(0, 7)))];
+      groupBy = date => date.slice(0, 7);
+      break;
+    default:
+      allDates = [];
+      groupBy = date => date;
+  }
+
+  allDates.sort();
+
+  allDates.forEach(date => {
+    const dailySales = sales.filter(s => groupBy(s.date) === date).reduce((a, s) => a + s.amount, 0);
+    const dailyExp = expenses.filter(e => groupBy(e.date) === date).reduce((a, e) => a + e.amount, 0);
+    const dailyIncassi = incassi.filter(i => groupBy(i.date) === date).reduce((a, i) => a + i.amount, 0);
+    const net = dailySales + dailyIncassi - dailyExp;
+
+    const row = generalSummaryTable.insertRow();
+    row.insertCell().textContent = date;
+    row.insertCell().textContent = round(dailyIncassi) + ' €';
+    row.insertCell().textContent = round(dailyExp) + ' €';
+    row.insertCell().textContent = round(net) + ' €';
+  });
 }
 let finChart;
 function renderFinance() {
