@@ -5,6 +5,7 @@
   <title>Gestionale Macelleria – Lorenzo Mangia</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="icon" href="images-removebg-preview.png" type="image/png">
   <style>
     body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f9f9f9;color:#222}
     header{background:url('selezione-carni.jpg') center/cover no-repeat;display:flex;align-items:center;justify-content:space-between;padding:30px 40px;color:#fff;position:relative;}
@@ -40,6 +41,7 @@
   <button onclick="showPage('vendite')">Vendite</button>
   <button onclick="showPage('spese')">Spese</button>
   <button onclick="showPage('ordinare')">Cose da ordinare</button>
+  <button onclick="showPage('incassi')">Incassi</button>
   <button onclick="downloadExcel()" style="margin-left:auto">Scarica Excel</button>
 </nav>
 
@@ -49,6 +51,7 @@
   <div>Guadagno oggi: <span id="todayProfit">0 €</span></div>
   <div>Spese oggi: <span id="todayExp">0 €</span></div>
   <div>Saldo oggi: <span id="balance">0 €</span></div>
+  <div>Incassi oggi: <span id="todayIncassi">0 €</span></div>
 </div>
 <h3 style="margin-top: 30px;">Resoconto mensile</h3>
 <table id="monthlySummaryTable">
@@ -139,6 +142,24 @@
 </table>
 </section>
 
+<section id="incassi" class="page">
+  <h2>Incassi</h2>
+  <form id="incassoForm">
+    <input id="incassoAmount" type="number" step="0.01" placeholder="Importo €" required>
+    <button>+ Aggiungi incasso</button>
+  </form>
+  <h3 style="margin-top: 30px;">Cronologia incassi</h3>
+  <div class="filter-bar">
+    <input type="text" id="searchIncassi" placeholder="Cerca incasso…" oninput="renderIncassiHistory()">
+  </div>
+  <table id="incassiHistoryTable">
+    <thead>
+      <tr><th>Data</th><th>Importo (€)</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</section>
+
 <section id="ordinare" class="page">
   <h2>Cose da ordinare</h2>
 
@@ -196,7 +217,8 @@ addProductForm.addEventListener('submit', e=>{
   const price=parseFloat(prodPrice.value);
   const p=products.find(p=>p.name===name);
   if(p){p.qty=round(p.qty+qty); p.price=price;} else products.push({name,qty:round(qty),price});
-  save(); renderAll(); addProductForm.reset();
+  save(); renderAll(); addProductForm.reset();renderFinance(); // Aggiorna il grafico delle finanze
+  updateDashboard();
 });
 function renderProducts(){
   const tbody=productTable.querySelector('tbody');
@@ -259,6 +281,47 @@ function renderProducts(){
 }
 window.removeStock=i=>{products[i].qty=round(Math.max(0,products[i].qty-1)); save(); renderAll();};
 window.deleteProd=i=>{products.splice(i,1); save(); renderAll();};
+/*------------INCASSI-----------*/
+let incassi = JSON.parse(localStorage.getItem('incassi')) || [];
+const saveIncassi = () => {
+  localStorage.setItem('incassi', JSON.stringify(incassi));
+};
+
+incassoForm.addEventListener('submit', e => {
+  e.preventDefault();
+  const amount = parseFloat(incassoAmount.value);
+  if (amount <= 0) {
+    alert('Importo non valido');
+    return;
+  }
+  incassi.push({ amount: round(amount), date: localDateISO() });
+  saveIncassi();
+  renderAll();
+  incassoForm.reset();
+});
+function renderIncassiHistory() {
+  const tbody = document.querySelector('#incassiHistoryTable tbody');
+  tbody.innerHTML = '';
+
+  let list = [...incassi].reverse(); // Mostra gli incassi più recenti per primi
+
+  const term = document.getElementById('searchIncassi').value.toLowerCase();
+  if (term) list = list.filter(i => i.amount.toString().toLowerCase().includes(term));
+
+  list.forEach(i => {
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${i.date}</td>
+        <td>${i.amount} €</td>
+      </tr>
+    `);
+  });
+}
+function updateIncassiToday() {
+  const today = localDateISO();
+  const todayIncassi = incassi.filter(i => i.date === today).reduce((a, i) => a + i.amount, 0);
+  document.getElementById('todayIncassi').textContent = round(todayIncassi) + ' €';
+}
 
 /* ---------- VENDITE ---------- */
 sellForm.addEventListener('submit',e=>{
@@ -347,25 +410,37 @@ function updateDashboard() {
   const today = localDateISO();
   const todaySales = sales.filter(s => s.date === today).reduce((a, s) => a + s.amount, 0);
   const todayExp = expenses.filter(e => e.date === today).reduce((a, e) => a + e.amount, 0);
+  const todayIncassi = incassi.filter(i => i.date === today).reduce((a, i) => a + i.amount, 0);
 
   todayProfit.textContent = round(todaySales) + ' €';
   todayExp.textContent = round(todayExp) + ' €';
-  balance.textContent = round(todaySales - todayExp) + ' €';
+  document.getElementById('todayIncassi').textContent = round(todayIncassi) + ' €';
+  balance.textContent = round(todaySales + todayIncassi - todayExp) + ' €';
   renderMonthlySummary();
 }
 let finChart;
-function renderFinance(){
-  const labels=[...Array(7)].map((_,i)=>{
-    const d=new Date(); d.setDate(d.getDate()-(6-i));
-    return d.toISOString().slice(0,10);
+function renderFinance() {
+  const labels = [...Array(7)].map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().slice(0, 10);
   });
-  const salesData=labels.map(d=>sales.filter(s=>s.date===d).reduce((a,s)=>a+s.amount,0));
-  const expData=labels.map(d=>expenses.filter(e=>e.date===d).reduce((a,e)=>a+e.amount,0));
-  if(finChart) finChart.destroy();
-  finChart=new Chart(financeChart,{type:'line',data:{labels,datasets:[
-    {label:'Guadagni',data:salesData,borderColor:'green',fill:false},
-    {label:'Spese',data:expData,borderColor:'red',fill:false}
-  ]}});
+  const salesData = labels.map(d => sales.filter(s => s.date === d).reduce((a, s) => a + s.amount, 0));
+  const expData = labels.map(d => expenses.filter(e => e.date === d).reduce((a, e) => a + e.amount, 0));
+  const incassiData = labels.map(d => incassi.filter(i => i.date === d).reduce((a, i) => a + i.amount, 0));
+
+  if (finChart) finChart.destroy();
+  finChart = new Chart(financeChart, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Guadagni', data: salesData, borderColor: 'green', fill: false },
+        { label: 'Spese', data: expData, borderColor: 'red', fill: false },
+        { label: 'Incassi', data: incassiData, borderColor: 'blue', fill: false }
+      ]
+    }
+  });
 }
 function renderMonthlySummary() {
   const tbody = document.querySelector('#monthlySummaryTable tbody');
@@ -374,22 +449,28 @@ function renderMonthlySummary() {
   const monthlyData = {};
   sales.forEach(s => {
     const month = s.date.slice(0, 7);
-    monthlyData[month] = monthlyData[month] || { sales: 0, expenses: 0 };
+    monthlyData[month] = monthlyData[month] || { sales: 0, expenses: 0, incassi: 0 };
     monthlyData[month].sales += s.amount;
   });
   expenses.forEach(e => {
     const month = e.date.slice(0, 7);
-    monthlyData[month] = monthlyData[month] || { sales: 0, expenses: 0 };
+    monthlyData[month] = monthlyData[month] || { sales: 0, expenses: 0, incassi: 0 };
     monthlyData[month].expenses += e.amount;
+  });
+  incassi.forEach(i => {
+    const month = i.date.slice(0, 7);
+    monthlyData[month] = monthlyData[month] || { sales: 0, expenses: 0, incassi: 0 };
+    monthlyData[month].incassi += i.amount;
   });
 
   Object.entries(monthlyData).forEach(([month, data]) => {
-    const net = data.sales - data.expenses;
+    const net = data.sales + data.incassi - data.expenses;
     tbody.insertAdjacentHTML('beforeend', `
       <tr>
         <td>${month}</td>
         <td>${round(data.sales)} €</td>
         <td>${round(data.expenses)} €</td>
+        <td>${round(data.incassi)} €</td>
         <td>${round(net)} €</td>
       </tr>
     `);
@@ -476,6 +557,8 @@ function renderAll(){
   renderToOrder();
   renderSalesHistory();
   renderExpensesHistory();
+  renderIncassiHistory();
+  updateIncassiToday();
 }
 renderAll();
 </script>
