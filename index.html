@@ -60,11 +60,16 @@
   </div>
   <h3>Resoconto generale</h3>
   <table id="generalSummaryTable">
-    <thead>
-      <tr><th>Data</th><th>Incasso</th><th>Spesa</th><th>Netto</th></tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <thead>
+    <tr>
+      <th style="text-align: center;">Data</th>
+      <th style="text-align: center;">Incasso</th>
+      <th style="text-align: center;">Spesa</th>
+      <th style="text-align: center;">Netto</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
 
 <canvas id="financeChart" height="100"></canvas>
   
@@ -466,7 +471,6 @@ function updateDashboard() {
       break;
   }
 
-  // ORDINA DAL PIÙ RECENTE AL PIÙ VECCHIO
   allDates.sort((a, b) => b.localeCompare(a));
 
   allDates.forEach(date => {
@@ -480,6 +484,12 @@ function updateDashboard() {
     row.insertCell().textContent = round(dailySales + dailyIncassi) + ' €';
     row.insertCell().textContent = round(dailyExp) + ' €';
     row.insertCell().textContent = round(net) + ' €';
+    
+    // Aggiungi stile di centratura a tutte le celle
+    Array.from(row.cells).forEach(cell => {
+      cell.style.textAlign = 'center';
+      cell.style.verticalAlign = 'middle';
+    });
   });
 }
 
