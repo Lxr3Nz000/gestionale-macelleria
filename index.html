@@ -515,12 +515,13 @@ function renderSalesHistory() {
 }
 
 /* ---------- EXCEL ---------- */
-function downloadExcel(){
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(products.map(p=>({Prodotto:p.name,Quantità_kg:p.qty,Prezzo_kg:p.price}))),'Prodotti');
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(sales.map(s=>({Data:s.date,Prodotto:s.name,Quantità_kg:s.qty,Ricavo:s.amount}))),'Vendite');
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(expenses.map(e=>({Data:e.date,Descrizione:e.desc,Importo:e.amount}))),'Spese');
-  XLSX.writeFile(wb,'macelleria_backup.xlsx');
+function downloadExcel() {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(products.map(p => ({ Prodotto: p.name, Quantità_kg: p.qty, Prezzo_kg: p.price }))), 'Prodotti');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sales.map(s => ({ Data: s.date, Prodotto: s.name, Quantità_kg: s.qty, Ricavo: s.amount }))), 'Vendite');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(expenses.map(e => ({ Data: e.date, Descrizione: e.desc, Importo: e.amount }))), 'Spese');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(incassi.map(i => ({ Data: i.date, Importo: i.amount }))), 'Incassi'); // Nuova scheda per gli incassi
+  XLSX.writeFile(wb, 'macelleria_backup.xlsx');
 }
 function renderExpensesHistory() {
   const tbody = document.querySelector('#expensesHistoryTable tbody');
