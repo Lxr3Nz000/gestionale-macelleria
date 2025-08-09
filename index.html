@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Gestionale Macelleria – Lorenzo Mangia</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f9f9f9;color:#222}
+    header{background:url('selezione-carni.jpg') center/cover no-repeat;display:flex;align-items:center;justify-content:space-between;padding:30px 40px;color:#fff;position:relative;}
+    header::before{content:'';position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:0;}
+    header h1{margin:0;font-size:32px;z-index:1;}
+    header img{width:90px;height:90px;border-radius:50%;border:3px solid #fff;object-fit:cover;z-index:1;}
+    nav{background:#fff;display:flex;gap:20px;padding:10px 20px;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+    nav button{background:none;border:none;font-size:15px;cursor:pointer;color:#b91c1c;font-weight:bold}
+    .page{display:none;padding:20px}
+    .page.active{display:block}
+    .kpi{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{padding:6px 10px;border-bottom:1px solid #ddd}
+    button{background:#b91c1c;color:#fff;border:none;border-radius:4px;padding:6px 10px;cursor:pointer}
+    footer{background:#222;color:#fff;text-align:center;padding:12px;font-size:13px;margin-top:40px}
+    .chart-title{text-align:center;font-weight:bold;font-size:18px;margin-bottom:10px;}
+    .pie-container{max-width:300px;margin:0 auto;}
+    .filter-bar{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+    .filter-bar input, .filter-bar select{padding:6px 8px;border:1px solid #ccc;border-radius:4px}
+    .filter-bar label{font-size:13px;}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Gestionale Macelleria</h1>
+  <img src="images.jpeg" alt="Logo">
+</header>
+
+<nav>
+  <button onclick="showPage('dashboard')">Dashboard</button>
+  <button onclick="showPage('magazzino')">Magazzino</button>
+  <button onclick="showPage('vendite')">Vendite</button>
+  <button onclick="showPage('spese')">Spese</button>
+  <button onclick="showPage('ordinare')">Cose da ordinare</button>
+  <button onclick="downloadExcel()" style="margin-left:auto">Scarica Excel</button>
+</nav>
+
+<section id="dashboard" class="page active">
+  <h2>Dashboard</h2>
+<div class="kpi">
+  <div>Guadagno oggi: <span id="todayProfit">0 €</span></div>
+  <div>Spese oggi: <span id="todayExp">0 €</span></div>
+  <div>Saldo oggi: <span id="balance">0 €</span></div>
+</div>
+<h3 style="margin-top: 30px;">Resoconto mensile</h3>
+<table id="monthlySummaryTable">
+  <thead>
+    <tr><th>Mese</th><th>Guadagno</th><th>Spese</th><th>Netto</th></tr>
+  </thead>
+  <tbody></tbody>
+</table>
+<canvas id="financeChart" height="100"></canvas>
+  
+</section>
+
+<section id="magazzino" class="page">
+  <h2>Magazzino</h2>
+  <form id="addProductForm">
+    <input id="prodName" placeholder="Nome prodotto" required>
+    <input id="prodQty" type="number" step="0.1" placeholder="Quantità (kg)" required>
+    <input id="prodPrice" type="number" step="0.01" placeholder="Prezzo al kg" required>
+    <button>+ Aggiungi</button>
+  </form>
+
+  <div class="filter-bar">
+    <input type="text" id="searchMagazzino" placeholder="Cerca prodotto…" oninput="renderProducts()">
+    <label>Ordina per:
+      <select id="sortMagazzino" onchange="renderProducts()">
+        <option value="name">Nome (A-Z)</option>
+        <option value="nameDesc">Nome (Z-A)</option>
+        <option value="qty">Quantità ↓</option>
+        <option value="qtyAsc">Quantità ↑</option>
+        <option value="price">Prezzo ↓</option>
+        <option value="priceAsc">Prezzo ↑</option>
+      </select>
+    </label>
+  </div>
+
+  <table id="productTable">
+    <thead>
+      <tr><th>Prodotto</th><th>Quantità (kg)</th><th>Prezzo/kg</th><th>Azioni</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="chart-title">Grafico vendite</div>
+  <canvas id="magazzinoChart" height="120"></canvas>
+</section>
+
+<section id="vendite" class="page">
+  <h2>Vendite</h2>
+
+  <form id="sellForm">
+    <select id="sellSelect"></select>
+    <input id="sellQty" type="number" step="0.1" placeholder="Quantità venduta" required>
+    <span>Totale: <span id="sellTotal">0 €</span></span>
+    <button>Registra vendita</button>
+  </form>
+
+  <h3 style="margin-top: 30px;">Cronologia vendite</h3>
+  <div class="filter-bar">
+    <input type="text" id="searchVendite" placeholder="Cerca prodotto…" oninput="renderSalesHistory()">
+  </div>
+  <table id="salesHistoryTable">
+    <thead>
+      <tr><th>Data</th><th>Prodotto</th><th>Quantità (kg)</th><th>Ricavo (€)</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<section id="spese" class="page">
+  <h2>Spese</h2>
+  <form id="expForm">
+    <input id="expDesc" placeholder="Alimento / voce" required>
+    <input id="expAmount" type="number" step="0.01" placeholder="Importo €" required>
+    <button>+ Aggiungi spesa</button>
+  </form>
+  <div class="pie-container">
+    <canvas id="expensePie" height="80"></canvas>
+  </div>
+  <h3 style="margin-top: 30px;">Cronologia spese</h3>
+<div class="filter-bar">
+  <input type="text" id="searchSpese" placeholder="Cerca spesa…" oninput="renderExpensesHistory()">
+</div>
+<table id="expensesHistoryTable">
+  <thead>
+    <tr><th>Data</th><th>Descrizione</th><th>Importo (€)</th></tr>
+  </thead>
+  <tbody></tbody>
+</table>
+</section>
+
+<section id="ordinare" class="page">
+  <h2>Cose da ordinare</h2>
+
+  <div class="filter-bar">
+    <input type="text" id="searchOrdinare" placeholder="Cerca prodotto…" oninput="renderToOrder()">
+    <label>Ordina per:
+      <select id="sortOrdinare" onchange="renderToOrder()">
+        <option value="name">Nome (A-Z)</option>
+        <option value="nameDesc">Nome (Z-A)</option>
+      </select>
+    </label>
+  </div>
+
+  <table id="toOrderTable">
+    <thead>
+      <tr><th>Prodotto</th><th>Quantità da ordinare (kg)</th><th>Azione</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <button id="markOrderedBtn">Segna ordinati</button>
+</section>
+
+<footer>
+  © 2025 Lorenzo Mangia  •  📞 +39 391 184 0925  •  ✉️ lorenzomangia16@gmail.com
+</footer>
+
+<script>
+/* ---------- UTIL ---------- */
+function localDateISO() {
+  const d = new Date();
+  const pad = n => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+let products   = JSON.parse(localStorage.getItem('prod'))  || [];
+let expenses   = JSON.parse(localStorage.getItem('exp'))   || [];
+let sales      = JSON.parse(localStorage.getItem('sales')) || [];
+const save = () => {
+  localStorage.setItem('prod', JSON.stringify(products));
+  localStorage.setItem('exp', JSON.stringify(expenses));
+  localStorage.setItem('sales', JSON.stringify(sales));
+};
+const round = n => Math.round(n*100)/100;
+
+/* ---------- NAV ---------- */
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* ---------- MAGAZZINO ---------- */
+addProductForm.addEventListener('submit', e=>{
+  e.preventDefault();
+  const name=prodName.value.trim();
+  const qty=parseFloat(prodQty.value);
+  const price=parseFloat(prodPrice.value);
+  const p=products.find(p=>p.name===name);
+  if(p){p.qty=round(p.qty+qty); p.price=price;} else products.push({name,qty:round(qty),price});
+  save(); renderAll(); addProductForm.reset();
+});
+function renderProducts(){
+  const tbody=productTable.querySelector('tbody');
+  tbody.innerHTML='';
+  let list=[...products];
+
+  // Filtro ricerca
+  const term=document.getElementById('searchMagazzino').value.toLowerCase();
+  if(term) list=list.filter(p=>p.name.toLowerCase().includes(term));
+
+  // Ordinamento
+  const sort=document.getElementById('sortMagazzino').value;
+  switch(sort){
+    case 'name':     list.sort((a,b)=>a.name.localeCompare(b.name)); break;
+    case 'nameDesc': list.sort((a,b)=>b.name.localeCompare(a.name)); break;
+    case 'qty':      list.sort((a,b)=>b.qty-a.qty); break;
+    case 'qtyAsc':   list.sort((a,b)=>a.qty-b.qty); break;
+    case 'price':    list.sort((a,b)=>b.price-a.price); break;
+    case 'priceAsc': list.sort((a,b)=>a.price-b.price); break;
+  }
+  function renderMonthlySummary() {
+  const tbody = document.querySelector('#monthlySummaryTable tbody');
+  tbody.innerHTML = '';
+
+  const monthlyData = {};
+  sales.forEach(s => {
+    const month = s.date.slice(0, 7);
+    monthlyData[month] = monthlyData[month] || { sales: 0, expenses: 0 };
+    monthlyData[month].sales += s.amount;
+  });
+  expenses.forEach(e => {
+    const month = e.date.slice(0, 7);
+    monthlyData[month] = monthlyData[month] || { sales: 0, expenses: 0 };
+    monthlyData[month].expenses += e.amount;
+  });
+
+  Object.entries(monthlyData).forEach(([month, data]) => {
+    const net = data.sales - data.expenses;
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${month}</td>
+        <td>${round(data.sales)} €</td>
+        <td>${round(data.expenses)} €</td>
+        <td>${round(net)} €</td>
+      </tr>
+    `);
+  });
+}
+
+  list.forEach((p,i)=>{
+    tbody.insertAdjacentHTML('beforeend',`
+      <tr>
+        <td>${p.name}</td><td>${p.qty} kg</td><td>${p.price} €/kg</td>
+        <td>
+          <button onclick="removeStock(${products.indexOf(p)})">-1 kg</button>
+          <button onclick="deleteProd(${products.indexOf(p)})">🗑</button>
+        </td>
+      </tr>`);
+  });
+}
+window.removeStock=i=>{products[i].qty=round(Math.max(0,products[i].qty-1)); save(); renderAll();};
+window.deleteProd=i=>{products.splice(i,1); save(); renderAll();};
+
+/* ---------- VENDITE ---------- */
+sellForm.addEventListener('submit',e=>{
+  e.preventDefault();
+  const i=sellSelect.selectedIndex;
+  const q=parseFloat(sellQty.value);
+  if(!q||q<=0||q>products[i].qty){alert('Quantità non valida');return;}
+  const amount=round(q*products[i].price);
+  products[i].qty=round(products[i].qty-q);
+  sales.push({name:products[i].name,qty:q,amount,date:localDateISO()});
+  save(); renderAll(); sellForm.reset();
+  renderMonthlySummary();
+});
+function renderSellSelect(){
+  sellSelect.innerHTML='';
+  products.forEach(p=>{
+    const opt=document.createElement('option');
+    opt.textContent=`${p.name} (${p.qty} kg)`;
+    sellSelect.appendChild(opt);
+  });
+}
+sellQty.addEventListener('input', ()=>{
+  const i = sellSelect.selectedIndex;
+  const q = parseFloat(sellQty.value) || 0;
+  sellTotal.textContent = round(q * products[i].price) + ' €';
+});
+
+/* ---------- SPESE ---------- */
+expForm.addEventListener('submit',e=>{
+  e.preventDefault();
+  expenses.push({desc:expDesc.value.trim(),amount:parseFloat(expAmount.value),date:localDateISO()});
+  save(); renderAll(); expForm.reset();
+  renderMonthlySummary();
+});
+let expPie;
+function renderExpensePie(){
+  const map={};
+  expenses.forEach(e=>{map[e.desc]=(map[e.desc]||0)+e.amount});
+  const labels=Object.keys(map);
+  const data=Object.values(map);
+  if(expPie) expPie.destroy();
+  expPie=new Chart(expensePie,{
+    type:'pie',
+    data:{labels,datasets:[{data,backgroundColor:labels.map((_,i)=>`hsl(${i*360/labels.length},70%,60%)`)}]}
+  });
+}
+
+/* ---------- COSE DA ORDINARE ---------- */
+function renderToOrder(){
+  const tbody=toOrderTable.querySelector('tbody');
+  tbody.innerHTML='';
+  let list=products.filter(p=>p.qty===0);
+
+  // Filtro ricerca
+  const term=document.getElementById('searchOrdinare').value.toLowerCase();
+  if(term) list=list.filter(p=>p.name.toLowerCase().includes(term));
+
+  // Ordinamento
+  const sort=document.getElementById('sortOrdinare').value;
+  switch(sort){
+    case 'name':     list.sort((a,b)=>a.name.localeCompare(b.name)); break;
+    case 'nameDesc': list.sort((a,b)=>b.name.localeCompare(a.name)); break;
+  }
+
+  list.forEach((p,i)=>{
+    const idx=products.indexOf(p);
+    tbody.insertAdjacentHTML('beforeend',`
+      <tr>
+        <td>${p.name}</td>
+        <td><input type="number" step="0.1" class="orderInput" data-index="${idx}" placeholder="kg"></td>
+        <td><button onclick="deleteProd(${idx})">Elimina</button></td>
+      </tr>`);
+  });
+}
+markOrderedBtn.addEventListener('click',()=>{
+  document.querySelectorAll('.orderInput').forEach(inp=>{
+    const idx=parseInt(inp.dataset.index);
+    const qty=parseFloat(inp.value);
+    if(qty>0){products[idx].qty=round(products[idx].qty+qty);}
+  });
+  save(); renderAll();
+});
+
+/* ---------- DASHBOARD ---------- */
+function updateDashboard() {
+  const today = localDateISO();
+  const todaySales = sales.filter(s => s.date === today).reduce((a, s) => a + s.amount, 0);
+  const todayExp = expenses.filter(e => e.date === today).reduce((a, e) => a + e.amount, 0);
+
+  todayProfit.textContent = round(todaySales) + ' €';
+  todayExp.textContent = round(todayExp) + ' €';
+  balance.textContent = round(todaySales - todayExp) + ' €';
+  renderMonthlySummary();
+}
+let finChart;
+function renderFinance(){
+  const labels=[...Array(7)].map((_,i)=>{
+    const d=new Date(); d.setDate(d.getDate()-(6-i));
+    return d.toISOString().slice(0,10);
+  });
+  const salesData=labels.map(d=>sales.filter(s=>s.date===d).reduce((a,s)=>a+s.amount,0));
+  const expData=labels.map(d=>expenses.filter(e=>e.date===d).reduce((a,e)=>a+e.amount,0));
+  if(finChart) finChart.destroy();
+  finChart=new Chart(financeChart,{type:'line',data:{labels,datasets:[
+    {label:'Guadagni',data:salesData,borderColor:'green',fill:false},
+    {label:'Spese',data:expData,borderColor:'red',fill:false}
+  ]}});
+}
+function renderMonthlySummary() {
+  const tbody = document.querySelector('#monthlySummaryTable tbody');
+  tbody.innerHTML = '';
+
+  const monthlyData = {};
+  sales.forEach(s => {
+    const month = s.date.slice(0, 7);
+    monthlyData[month] = monthlyData[month] || { sales: 0, expenses: 0 };
+    monthlyData[month].sales += s.amount;
+  });
+  expenses.forEach(e => {
+    const month = e.date.slice(0, 7);
+    monthlyData[month] = monthlyData[month] || { sales: 0, expenses: 0 };
+    monthlyData[month].expenses += e.amount;
+  });
+
+  Object.entries(monthlyData).forEach(([month, data]) => {
+    const net = data.sales - data.expenses;
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${month}</td>
+        <td>${round(data.sales)} €</td>
+        <td>${round(data.expenses)} €</td>
+        <td>${round(net)} €</td>
+      </tr>
+    `);
+  });
+}
+
+/* ---------- CHART MAGAZZINO ---------- */
+let magazzinoChart;
+function renderMagazzinoChart(){
+  const map={};
+  sales.forEach(s=>{map[s.name]=(map[s.name]||0)+s.qty});
+  const sorted=Object.entries(map).sort((a,b)=>b[1]-a[1]);
+  const labels=sorted.map(x=>x[0]);
+  const data=sorted.map(x=>x[1]);
+  if(magazzinoChart) magazzinoChart.destroy();
+  magazzinoChart=new Chart(document.getElementById('magazzinoChart'),{
+    type:'bar',
+    data:{labels,datasets:[{label:'kg venduti',data,backgroundColor:'#b91c1c'}]},
+    options:{barThickness:25}
+  });
+}
+
+function renderSalesHistory() {
+  const tbody = document.querySelector('#salesHistoryTable tbody');
+  tbody.innerHTML = '';
+
+  let list = [...sales].reverse(); // Più recente prima
+
+  const term = document.getElementById('searchVendite').value.toLowerCase();
+  if (term) list = list.filter(s => s.name.toLowerCase().includes(term));
+
+  list.forEach(s => {
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${s.date}</td>
+        <td>${s.name}</td>
+        <td>${s.qty} kg</td>
+        <td>${s.amount} €</td>
+      </tr>
+    `);
+  });
+}
+
+/* ---------- EXCEL ---------- */
+function downloadExcel(){
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(products.map(p=>({Prodotto:p.name,Quantità_kg:p.qty,Prezzo_kg:p.price}))),'Prodotti');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(sales.map(s=>({Data:s.date,Prodotto:s.name,Quantità_kg:s.qty,Ricavo:s.amount}))),'Vendite');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(expenses.map(e=>({Data:e.date,Descrizione:e.desc,Importo:e.amount}))),'Spese');
+  XLSX.writeFile(wb,'macelleria_backup.xlsx');
+}
+function renderExpensesHistory() {
+  const tbody = document.querySelector('#expensesHistoryTable tbody');
+  tbody.innerHTML = '';
+
+  let list = [...expenses].reverse(); // Mostra le spese più recenti per prime
+
+  const term = document.getElementById('searchSpese').value.toLowerCase();
+  if (term) list = list.filter(e => e.desc.toLowerCase().includes(term));
+
+  list.forEach(e => {
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${e.date}</td>
+        <td>${e.desc}</td>
+        <td>${e.amount} €</td>
+      </tr>
+    `);
+  });
+
+  // Mostra la somma totale delle spese
+  const totalExpenses = expenses.reduce((a, e) => a + e.amount, 0);
+  document.getElementById('todayExp').textContent = round(totalExpenses) + ' €';
+}
+
+/* ---------- RENDER ALL ---------- */
+function renderAll(){
+  renderProducts();
+  renderSellSelect();
+  updateDashboard();
+  renderFinance();
+  renderExpensePie();
+  renderMagazzinoChart();
+  renderToOrder();
+  renderSalesHistory();
+  renderExpensesHistory();
+}
+renderAll();
+</script>
+</body>
+</html>
