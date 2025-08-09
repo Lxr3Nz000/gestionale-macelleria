@@ -48,7 +48,17 @@
   <button onclick="downloadExcel()" style="margin-left:auto">Scarica Excel</button>
 </nav>
 
-
+<section id="dashboard" class="page active">
+<h3 style="margin-top: 30px;">Resoconto mensile</h3>
+<table id="monthlySummaryTable">
+  <thead>
+    <tr><th>Mese</th><th>Guadagno</th><th>Spese</th><th>Netto</th></tr>
+  </thead>
+  <tbody></tbody>
+</table>
+<canvas id="financeChart" height="100"></canvas>
+  
+</section>
 
 <section id="magazzino" class="page">
   <h2>Magazzino</h2>
