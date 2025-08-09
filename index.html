@@ -53,10 +53,10 @@
   <div class="filter-bar">
     <label for="summaryType">Visualizza:</label>
     <select id="summaryType">
-      <option value="daily">Giornalmente</option>
-      <option value="weekly">Settimanalmente</option>
-      <option value="monthly">Mensilmente</option>
-    </select>
+  <option value="monthly" selected>Mensilmente</option>
+  <option value="daily">Giornalmente</option>
+  <option value="weekly">Settimanalmente</option>
+</select>
   </div>
   <h3>Resoconto generale</h3>
   <table id="generalSummaryTable">
@@ -217,6 +217,9 @@ function showPage(id){
 function updateOrderBell() {
   const orderBell = document.getElementById('orderBell');
   const hasZeroQuantityItems = products.some(p => p.qty === 0);
+  
+  console.log('Check pallino - Prodotti a zero:', hasZeroQuantityItems); // Debug
+  
   if (orderBell) {
     orderBell.style.display = hasZeroQuantityItems ? 'inline-block' : 'none';
   }
@@ -232,6 +235,7 @@ addProductForm.addEventListener('submit', e=>{
   if(p){p.qty=round(p.qty+qty); p.price=price;} else products.push({name,qty:round(qty),price});
   save(); renderAll(); addProductForm.reset();renderFinance(); // Aggiorna il grafico delle finanze
   updateDashboard();
+  updateOrderBell();
 });
 function renderProducts(){
   const tbody=productTable.querySelector('tbody');
@@ -344,9 +348,17 @@ sellForm.addEventListener('submit',e=>{
   if(!q||q<=0||q>products[i].qty){alert('Quantità non valida');return;}
   const amount=round(q*products[i].price);
   products[i].qty=round(products[i].qty-q);
+  
+  // AGGIUNTO: Aggiungi sia agli incassi che alle vendite
+  incassi.push({ amount: amount, date: localDateISO() });
+  saveIncassi();
+  
   sales.push({name:products[i].name,qty:q,amount,date:localDateISO()});
-  save(); renderAll(); sellForm.reset();
+  save(); 
+  renderAll(); 
+  sellForm.reset();
   renderMonthlySummary();
+  updateDashboard(); // AGGIUNTO: Aggiorna la dashboard
 });
 function renderSellSelect(){
   sellSelect.innerHTML='';
@@ -386,7 +398,12 @@ function renderExpensePie(){
 function renderToOrder(){
   const tbody=toOrderTable.querySelector('tbody');
   tbody.innerHTML='';
+  
+  // Controlla se ci sono prodotti da ordinare
   let list=products.filter(p=>p.qty===0);
+  
+  // IMPORTANTE: Aggiorna il pallino qui
+  updateOrderBell();
 
   // Filtro ricerca
   const term=document.getElementById('searchOrdinare').value.toLowerCase();
@@ -419,7 +436,6 @@ markOrderedBtn.addEventListener('click',()=>{
 });
 
 /* ---------- DASHBOARD ---------- */
-/* ---------- DASHBOARD ---------- */
 function updateDashboard() {
   const summaryType = document.getElementById('summaryType').value;
   const generalSummaryTable = document.getElementById('generalSummaryTable').getElementsByTagName('tbody')[0];
@@ -444,15 +460,14 @@ function updateDashboard() {
       };
       break;
     case 'monthly':
+    default:
       allDates = [...new Set([...sales, ...expenses, ...incassi].map(t => t.date.slice(0, 7)))];
       groupBy = date => date.slice(0, 7);
       break;
-    default:
-      allDates = [];
-      groupBy = date => date;
   }
 
-  allDates.sort();
+  // ORDINA DAL PIÙ RECENTE AL PIÙ VECCHIO
+  allDates.sort((a, b) => b.localeCompare(a));
 
   allDates.forEach(date => {
     const dailySales = sales.filter(s => groupBy(s.date) === date).reduce((a, s) => a + s.amount, 0);
@@ -462,7 +477,7 @@ function updateDashboard() {
 
     const row = generalSummaryTable.insertRow();
     row.insertCell().textContent = date;
-    row.insertCell().textContent = round(dailyIncassi) + ' €';
+    row.insertCell().textContent = round(dailySales + dailyIncassi) + ' €';
     row.insertCell().textContent = round(dailyExp) + ' €';
     row.insertCell().textContent = round(net) + ' €';
   });
@@ -613,6 +628,8 @@ function renderAll() {
 }
 
 document.getElementById('summaryType').addEventListener('change', updateDashboard);
+document.getElementById('summaryType').value = 'monthly'; // Imposta mensile come default
+updateDashboard(); // Aggiorna la dashboard con le impostazioni mensili
 renderAll();
 </script>
 </body>
